@@ -5,8 +5,8 @@ nonogram(RowsHint, ColumnsHint):-
     C > 0,
     empty_grid(Grid, R, C),
     print_puzzle(Grid,RowsHint, ColumnsHint),
-    solve(Grid, RowsHint, ColumnsHint, Solution),
-    print_puzzle(Solution,RowsHint, ColumnsHint).
+    solve(Grid, RowsHint, ColumnsHint),
+    print_puzzle(Grid, RowsHint, ColumnsHint).
 
 % TODO: very similiar to above predicate, mabye simplify
 nonogram_user(RowsHint, ColumnsHint) :-
@@ -20,7 +20,6 @@ nonogram_user(RowsHint, ColumnsHint) :-
 
 % TODO: rework user input to check for valid input and retry if not valid and implement undo when asked if the user want to continue 
 user_input(Grid, RowsHint, ColumnsHint) :- 
-    nl,
     writeln('Enter grid cell (Col,Row):'),
     write('Enter Col:'),
     read(Col), 
@@ -34,7 +33,7 @@ user_input(Grid, RowsHint, ColumnsHint) :-
     read(Continue),
     (continue(Continue) ->
         user_input(NewGrid, RowsHint, ColumnsHint); 
-        valid_puzzle(NewGrid, RowsHint, ColumnsHint) -> write('Correct solution. You win!');write('Wrong solution. Game Over!')
+        solve(NewGrid, RowsHint, ColumnsHint) -> write('Correct solution. You win!');write('Wrong solution. Game Over!')
     ).
 
 continue('y').
@@ -69,14 +68,14 @@ empty_grid([Row|Rest], R, C) :-
     empty_grid(Rest, R1, C).
 
 empty_row([], 0).
-empty_row(['_'|Tail], N) :- 
+empty_row([_|Tail], N) :- 
     N > 0,
     N1 is N-1,
     empty_row(Tail, N1).
 
 print_puzzle(Grid, RowsHint, ColumnsHint) :-
     print_rows(Grid,RowsHint), 
-    print_columns(ColumnsHint).
+    print_columns(ColumnsHint),nl.
 
 print_rows([], []).
 print_rows([Head|RestRows], [Hints|RestHints]) :-
@@ -90,7 +89,8 @@ print_list([Head|Tail], Seperator) :-
     write(Seperator),
     print_list(Tail, Seperator).
 
-print_element(E) :- var(E), !, write(' ').
+% TODO: fix output for columns (should be whitespace instead of underscore)
+print_element(E) :- var(E), !, write('_').
 print_element(E) :- write(E).
 
 print_columns([]).
@@ -103,22 +103,14 @@ print_columns(Cols) :-
 first_elements([], _, []).
 first_elements([Head|Rest],Head, Rest).
 
-solve(Grid, RowsHint, ColumnsHint, Solution) :-
-    valid_puzzle(Grid, RowsHint, ColumnsHint),
-    labeling_solution(Grid),
-    Solution = Grid.
-
-valid_puzzle(Grid, RowsHint, ColumnsHint) :-
+solve(Grid, RowsHint, ColumnsHint) :-
+    transpose(Grid, Columns),!,
     maplist(valid_row, Grid, RowsHint),
-    transpose(Grid, Columns),
     maplist(valid_row, Columns, ColumnsHint).
 
-split([],_,[]).
-split(List, Spliterator, [List]) :- not_in_list(Spliterator, List).
-split([Spliterator|List], Spliterator, Result) :- split(List, Spliterator, Result).
-split(List, Spliterator, [Sublist|Result]) :-
-   append(Sublist, [Spliterator|Rest], List),
-   split(Rest, Spliterator, Result).
+trim([],[]).
+trim(List, List).
+trim(['_'|List], Result) :- trim(List, Result).
 
 transpose([],[]).
 transpose([[]|Tail],Result) :- transpose(Tail, Result).
@@ -126,21 +118,38 @@ transpose(Grid, [Firsts|Result]) :-
     maplist(first_elements, Grid, Firsts, Rest),
     transpose(Rest, Result).
 
-valid_row(Row, Hints) :-
-    split(Row,'_',Sublists),
-    length(Sublists, SubLen),
-    length(Hints, SubLen),
-    maplist(length,Sublists, Hints), !.
+valid_row([],[]) :- !.
+valid_row(Row, [BlockLen|[]]) :-
+    trim(Row,Row2),
+    valid_block(Row2, Row3, BlockLen),
+    trim(Row3,Row4),
+    valid_row(Row4, []).
 
-not_in_list(_, []).
-not_in_list(Element, [Head | Tail]) :-
-    Element \= Head,
-    not_in_list(Element, Tail).
+valid_row(Row, [BlockLen|Hints]) :-
+    trim(Row,Row2),
+    valid_block(Row2, Row3, BlockLen),
+    space(Row3, Row4),
+    valid_row(Row4, Hints).
+
+space(['_'|Row], Row).
+
+valid_block(Row, Row, 0).
+valid_block(['X'|Row], Rest, N) :-
+    N > 0,
+    N1 is N - 1,
+    valid_block(Row, Rest, N1).
 
 test(N) :- puzzle(N, R, C), nonogram(R,C).
 
 user(N) :- puzzle(N,R,C), nonogram_user(R,C).
 
+
+/**
+ * This test should produce the following output:
+ *  x   x   
+ *  x x     
+ *    x      
+ */
 puzzle(1, R, C) :- 
     R = [[1,1],[2],[1]],
     C = [[2],[2],[1]].
@@ -149,9 +158,11 @@ puzzle(2, R, C) :-
     R = [[4],[2,1],[2],[2],[2]],
     C = [[1,1],[2,1],[1],[3,1],[1,1,1]].
 
+% TODO:optimize solution as bigger puzzles will require more computation time, the program already struggles with this puzzle(9x8) ... 
 puzzle(3, R, C) :- 
     R = [[3],[2,1],[3,2],[2,2],[6],[1,5],[6],[1],[2]], 
     C = [[1,2],[3,1],[1,5],[7,1],[5],[3],[4],[3]]. 
 
 % TODO: define further puzzles, maybe arrange them after complexity 1 to 5
 % when the user selects a difficulty one of many puzzles of that difficulty gets randomly selected
+
