@@ -1,48 +1,99 @@
-nonogram(RowsHint, ColumnsHint):-
-    length(RowsHint, R),
-    R > 0,
-    length(ColumnsHint, C),
-    C > 0,
+nonogram(RowsHint, ColumnsHint, UserInput):-
+    get_lengths(RowsHint, ColumnsHint, R, C),
     empty_grid(Grid, R, C),
     print_puzzle(Grid,RowsHint, ColumnsHint),
-    solve(Grid, RowsHint, ColumnsHint),
-    print_puzzle(Grid, RowsHint, ColumnsHint).
+    (UserInput ->
+       user_input(Grid, RowsHint, ColumnsHint);
 
-% TODO: very similiar to above predicate, mabye simplify
-nonogram_user(RowsHint, ColumnsHint) :-
-    length(RowsHint, R),
-    R > 0,
-    length(ColumnsHint, C),
-    C > 0,
-    empty_grid(Grid, R, C),
-    print_puzzle(Grid,RowsHint, ColumnsHint),
-    user_input(Grid, RowsHint, ColumnsHint).
-
-% TODO: rework user input to check for valid input and retry if not valid and implement undo when asked if the user want to continue 
-user_input(Grid, RowsHint, ColumnsHint) :- 
-    writeln('Enter grid cell (Col,Row):'),
-    write('Enter Col:'),
-    read(Col), 
-    Col >= 0, 
-    write('Enter Row:'),
-    read(Row), 
-    Row >= 0,
-    mark_cell(Grid, Row, Col, NewGrid),
-    print_puzzle(NewGrid, RowsHint, ColumnsHint),
-    write('Continue? y/n'),
-    read(Continue),
-    (continue(Continue) ->
-        user_input(NewGrid, RowsHint, ColumnsHint); 
-        solve(NewGrid, RowsHint, ColumnsHint) -> write('Correct solution. You win!');write('Wrong solution. Game Over!')
+       solve(Grid, RowsHint, ColumnsHint),
+       print_puzzle(Grid, RowsHint, ColumnsHint)
     ).
 
-continue('y').
+user_input(Grid, RowsHint, ColumnsHint) :-
+    writeln('Enter grid cell (Col,Row):'),
+    read_cell(Col, Row),
+    (valid_input(Col, Row, RowsHint, ColumnsHint) ->
+       mark_cell(Grid, Row, Col, 'X', NewGrid),
+       print_puzzle(NewGrid, RowsHint, ColumnsHint),
+       write('Continue or undo last move? y/u/n'),
+       read(Continue),
+       continue(Continue, NewGrid, RowsHint, ColumnsHint);
 
-% TODO: implement unmark_cell (because we have mark_cell, we automatically have the reverse function unmark_cell, but it has to be included in user input)
+       write('Invalid input. '),
+       user_input(Grid, RowsHint, ColumnsHint)
+    ).
 
-mark_cell(Grid, R, C, NewGrid) :- 
+continue('y', Grid, RowsHint, ColumnsHint) :-
+    user_input(Grid, RowsHint, ColumnsHint).
+
+continue('u', Grid, RowsHint, ColumnsHint) :-
+    writeln('Enter the cell you want to clear (Col,Row):'),
+    read_cell(Col, Row),
+    (valid_input(Col, Row, RowsHint, ColumnsHint) ->
+       mark_cell(Grid, Row, Col, '_', NewGrid),
+       print_puzzle(NewGrid, RowsHint, ColumnsHint),
+       user_input(NewGrid, RowsHint, ColumnsHint);
+       write('Invalid input. '),
+       continue('u', Grid, RowsHint, ColumnsHint)
+    ).
+
+continue(_, Grid, RowsHint, ColumnsHint) :-
+    get_lengths(RowsHint, ColumnsHint, R, C),
+    empty_grid(CorrectGrid, R, C),
+    solve(CorrectGrid, RowsHint, ColumnsHint),
+    (maplist(x_at_same_position, Grid, CorrectGrid) ->
+             write('Correct solution. You win!');
+             writeln('Wrong solution. Game Over!'),
+             grid_diff(Grid, CorrectGrid, DiffGrid),
+             print_puzzle(DiffGrid, RowsHint, ColumnsHint)
+    ).
+
+x_at_same_position([], []).
+x_at_same_position([CellGrid|RestGrid], [CellCorrect|RestCorrect]) :-
+    (CellGrid == 'X', CellCorrect == 'X' ;
+     CellGrid \== 'X', CellCorrect \== 'X'), %Grid uses anon. vars and CorrectGrid "_" strings so a direct comp with == is not possible
+    x_at_same_position(RestGrid, RestCorrect).
+
+
+grid_diff([], [], []).
+grid_diff([RowGrid|RestGrid], [RowCorrect|RestCorrect], [RowDiff|RestDiff]) :-
+    maplist(compare_cell, RowGrid, RowCorrect, RowDiff),
+    grid_diff(RestGrid, RestCorrect, RestDiff).
+
+compare_cell(CellGrid, CellCorrect, CellDiff) :-
+    (CellGrid == CellCorrect ->
+        CellDiff = '\e[32mX\e[0m';
+        (CellGrid == 'X' ->
+           CellDiff = '\e[31mX\e[0m';
+           (CellCorrect == 'X' ->
+              CellDiff = '\e[90mX\e[0m';
+              CellDiff = '_'
+           )
+        )
+     ).
+
+
+get_lengths(RowsHint, ColumnsHint, R, C) :-
+    length(RowsHint, R),
+    R > 0,
+    length(ColumnsHint, C),
+    C > 0.
+
+read_cell(Col, Row) :-
+    write('Enter Col:'),
+    read(Col),
+    write('Enter Row:'),
+    read(Row).
+
+valid_input(Col, Row, RowsHint, ColumnsHint) :-
+    get_lengths(RowsHint, ColumnsHint, R, C),
+    number(Col), number(Row),
+    Col >= 0, Col < C,
+    Row >= 0, Row < R.
+
+mark_cell(Grid, R, C, Symbol, NewGrid) :-
     find_element_at(R, Grid, Row),
-    replace_at_pos(Row, C, 'X',NewRow),
+    replace_at_pos(Row, C, Symbol, NewRow),
     replace_at_pos(Grid, R, NewRow, NewGrid).
 
 find_element_at(0, [Head|_], Head).
@@ -68,13 +119,13 @@ empty_grid([Row|Rest], R, C) :-
     empty_grid(Rest, R1, C).
 
 empty_row([], 0).
-empty_row([_|Tail], N) :- 
+empty_row([_|Tail], N) :-
     N > 0,
     N1 is N-1,
     empty_row(Tail, N1).
 
 print_puzzle(Grid, RowsHint, ColumnsHint) :-
-    print_rows(Grid,RowsHint), 
+    print_rows(Grid,RowsHint),
     print_columns(ColumnsHint),nl.
 
 print_rows([], []).
@@ -84,18 +135,18 @@ print_rows([Head|RestRows], [Hints|RestHints]) :-
     print_rows(RestRows,RestHints).
 
 print_list([],_).
-print_list([Head|Tail], Seperator) :- 
-    print_element(Head),
+print_list([Head|Tail], Seperator) :-
+    print_element(Head, Seperator),
     write(Seperator),
     print_list(Tail, Seperator).
 
-% TODO: fix output for columns (should be whitespace instead of underscore)
-print_element(E) :- var(E), !, write('_').
-print_element(E) :- write(E).
+print_element(E, Sep) :- var(E) ->
+                          (Sep == ' ' -> write(' ');write('_'));
+                          write(E).
 
 print_columns([]).
 print_columns([[]|Tail]) :- write(' '), write(' '),print_columns(Tail). % in case of empty list, add whitespace
-print_columns(Cols) :- 
+print_columns(Cols) :-
     maplist(first_elements, Cols, Firsts, Rest),
     print_list(Firsts, ' '), nl,
     print_columns(Rest).
@@ -139,29 +190,31 @@ valid_block(['X'|Row], Rest, N) :-
     N1 is N - 1,
     valid_block(Row, Rest, N1).
 
-test(N) :- puzzle(N, R, C), nonogram(R,C).
+test(N) :- puzzle(N, R, C), nonogram(R, C, false).
 
-user(N) :- puzzle(N,R,C), nonogram_user(R,C).
+user(N) :- puzzle(N, R, C), nonogram(R, C, true).
 
 
 /**
  * This test should produce the following output:
- *  x   x   
- *  x x     
- *    x      
+ *  x   x
+ *  x x
+ *    x
  */
-puzzle(1, R, C) :- 
+puzzle(1, R, C) :-
     R = [[1,1],[2],[1]],
     C = [[2],[2],[1]].
 
-puzzle(2, R, C) :- 
+puzzle(2, R, C) :-
     R = [[4],[2,1],[2],[2],[2]],
     C = [[1,1],[2,1],[1],[3,1],[1,1,1]].
 
-% TODO:optimize solution as bigger puzzles will require more computation time, the program already struggles with this puzzle(9x8) ... 
-puzzle(3, R, C) :- 
-    R = [[3],[2,1],[3,2],[2,2],[6],[1,5],[6],[1],[2]], 
-    C = [[1,2],[3,1],[1,5],[7,1],[5],[3],[4],[3]]. 
+% TODO: optimize solution as bigger puzzles will require more
+% computation time, the program already struggles with this puzzle(9x8)
+% ...
+puzzle(3, R, C) :-
+    R = [[3],[2,1],[3,2],[2,2],[6],[1,5],[6],[1],[2]],
+    C = [[1,2],[3,1],[1,5],[7,1],[5],[3],[4],[3]].
 
 % TODO: define further puzzles, maybe arrange them after complexity 1 to 5
 % when the user selects a difficulty one of many puzzles of that difficulty gets randomly selected
