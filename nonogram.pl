@@ -5,7 +5,7 @@ nonogram(RowsHint, ColumnsHint, UserInput):-
     (UserInput ->
        user_input(Grid, RowsHint, ColumnsHint);
 
-       solve(Grid, RowsHint, ColumnsHint),
+       solve(Grid, RowsHint, ColumnsHint, true),
        print_puzzle(Grid, RowsHint, ColumnsHint)
     ).
 
@@ -40,7 +40,7 @@ continue('u', Grid, RowsHint, ColumnsHint) :-
 continue(_, Grid, RowsHint, ColumnsHint) :-
     get_lengths(RowsHint, ColumnsHint, R, C),
     empty_grid(CorrectGrid, R, C),
-    solve(CorrectGrid, RowsHint, ColumnsHint),
+    solve(CorrectGrid, RowsHint, ColumnsHint, true),
     (maplist(x_at_same_position, Grid, CorrectGrid) ->
              write('Correct solution. You win!');
              writeln('Wrong solution. Game Over!'),
@@ -154,12 +154,32 @@ print_columns(Cols) :-
 first_elements([], _, []).
 first_elements([Head|Rest],Head, Rest).
 
-solve(Grid, RowsHint, ColumnsHint) :-
-    transpose(Grid, Columns),!,
-    maplist(valid_row, Grid, RowsHint),
-    maplist(valid_row, Columns, ColumnsHint).
+optimList([],[],[]).
+optimList([Element|Elements], [Hint|Hints],[element(SolutionCount, Element, Hint)|Result]) :-
+    length(Element, ElemLength),
+    length(ElementCopy, ElemLength),
+    findall(ElementCopy, valid_row(Element, Hint), Solutions),
+    length(Solutions, SolutionCount),
+    optimList(Elements, Hints, Result).
 
-trim([],[]).
+solve(Grid, RowsHint, ColumnsHint, Optimize) :-
+    transpose(Grid, Columns),!,
+    (Optimize ->
+        append(RowsHint, ColumnsHint, AllHints),
+        append(Grid, Columns, Elements),
+        optimList(Elements, AllHints, OptimList),
+        sort(OptimList, SortedOptimList),
+        solve(SortedOptimList);
+
+        maplist(valid_row, Grid, RowsHint),
+        maplist(valid_row, Columns, ColumnsHint)
+    ).
+
+solve([]).
+solve([element(_,Element,Hint)|Rest]) :-
+    valid_row(Element, Hint),
+    solve(Rest).
+
 trim(List, List).
 trim(['_'|List], Result) :- trim(List, Result).
 
@@ -231,14 +251,19 @@ puzzle(2, 3, R, C) :-
     C = [[1],[5],[2],[5],[2,1],[2]].
 
 
-
-
-% TODO: optimize solution as bigger puzzles will require more
-% computation time, the program already struggles with this puzzle(9x8)
-%
+%Complexity 3
 puzzle(3, 1, R, C) :-
     R = [[3],[2,1],[3,2],[2,2],[6],[1,5],[6],[1],[2]],
     C = [[1,2],[3,1],[1,5],[7,1],[5],[3],[4],[3]].
+
+
+%Complexity 4
+puzzle(4, 1, R, C) :-
+    R = [[3],[4,2],[6,6],[6,2,1],[1,4,2,1],[6,3,2],[6,7],[6,8],[1,10],
+                [1,10],[1,10],[1,1,4,4],[3,4,4],[4,4],[4,4]],
+    C = [[1],[11],[3,3,1],[7,2],[7],[15],[1,5,7],[2,8],[14],[9],[1,6],
+                [1,9],[1,9],[1,10],[12]].
+    
 
 % TODO: define further puzzles for complexity 1 to 5
 
