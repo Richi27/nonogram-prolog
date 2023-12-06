@@ -190,32 +190,55 @@ valid_block(['X'|Row], Rest, N) :-
     N1 is N - 1,
     valid_block(Row, Rest, N1).
 
-test(N) :- puzzle(N, R, C), nonogram(R, C, false).
+test(N) :- random_puzzle(N, R, C), nonogram(R, C, false).
 
-user(N) :- puzzle(N, R, C), nonogram(R, C, true).
+user(N) :- random_puzzle(N, R, C), nonogram(R, C, true).
 
 
-/**
- * This test should produce the following output:
- *  x   x
- *  x x
- *    x
- */
-puzzle(1, R, C) :-
+random_puzzle(N, R, C) :-
+    findall(puzzle(N, _, R,  C), puzzle(N, _, R,  C), Puzzles),
+    random_member(puzzle(N, _, R, C), Puzzles).
+
+% Complexity 1
+% This test should produce the following output:
+%  x   x
+%  x x
+%    x
+puzzle(1, 1, R, C) :-
     R = [[1,1],[2],[1]],
     C = [[2],[2],[1]].
 
-puzzle(2, R, C) :-
+puzzle(1, 2, R, C) :-
+    R = [[2],[2],[1]],
+    C = [[1,1],[2],[1]].
+
+puzzle(1, 3, R, C) :-
+    R = [[3],[1],[1]],
+    C = [[1],[1, 1],[2]].
+
+
+%Complexity 2
+puzzle(2, 1, R, C) :-
     R = [[4],[2,1],[2],[2],[2]],
     C = [[1,1],[2,1],[1],[3,1],[1,1,1]].
 
+puzzle(2, 2, R, C) :-
+    R = [[3],[1,1,1],[3],[1,1],[1,1]],
+    C = [[1,1],[1,2],[3],[1,2],[1,1]].
+
+puzzle(2, 3, R, C) :-
+    R = [[2,1],[1,3],[1,2],[3],[4], [1]],
+    C = [[1],[5],[2],[5],[2,1],[2]].
+
+
+
+
 % TODO: optimize solution as bigger puzzles will require more
 % computation time, the program already struggles with this puzzle(9x8)
-% ...
-puzzle(3, R, C) :-
+%
+puzzle(3, 1, R, C) :-
     R = [[3],[2,1],[3,2],[2,2],[6],[1,5],[6],[1],[2]],
     C = [[1,2],[3,1],[1,5],[7,1],[5],[3],[4],[3]].
 
-% TODO: define further puzzles, maybe arrange them after complexity 1 to 5
-% when the user selects a difficulty one of many puzzles of that difficulty gets randomly selected
+% TODO: define further puzzles for complexity 1 to 5
 
