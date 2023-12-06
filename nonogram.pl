@@ -1,3 +1,8 @@
+/**
+    Nonogram Solver in Prolog by Richard Hoang, Sebastian Windsperger and Julia Weißenbrunner
+*/
+
+% Solve the nonogram with according Rows- and Colum Hints either with User Input or automatically solve it
 nonogram(RowsHint, ColumnsHint, UserInput):-
     get_lengths(RowsHint, ColumnsHint, R, C),
     empty_grid(Grid, R, C),
@@ -9,6 +14,7 @@ nonogram(RowsHint, ColumnsHint, UserInput):-
        print_puzzle(Grid, RowsHint, ColumnsHint)
     ).
 
+% ----- Control and process the user input -----
 user_input(Grid, RowsHint, ColumnsHint) :-
     writeln('Enter grid cell (Col,Row):'),
     read_cell(Col, Row),
@@ -23,9 +29,11 @@ user_input(Grid, RowsHint, ColumnsHint) :-
        user_input(Grid, RowsHint, ColumnsHint)
     ).
 
+% continue solving
 continue('y', Grid, RowsHint, ColumnsHint) :-
     user_input(Grid, RowsHint, ColumnsHint).
 
+% clear cell
 continue('u', Grid, RowsHint, ColumnsHint) :-
     writeln('Enter the cell you want to clear (Col,Row):'),
     read_cell(Col, Row),
@@ -37,6 +45,7 @@ continue('u', Grid, RowsHint, ColumnsHint) :-
        continue('u', Grid, RowsHint, ColumnsHint)
     ).
 
+% User is finished - check if it's correct
 continue(_, Grid, RowsHint, ColumnsHint) :-
     get_lengths(RowsHint, ColumnsHint, R, C),
     empty_grid(CorrectGrid, R, C),
@@ -54,7 +63,7 @@ x_at_same_position([CellGrid|RestGrid], [CellCorrect|RestCorrect]) :-
      CellGrid \== 'X', CellCorrect \== 'X'), %Grid uses anon. vars and CorrectGrid "_" strings so a direct comp with == is not possible
     x_at_same_position(RestGrid, RestCorrect).
 
-
+% calculate grid differences to enable printig grid with informations about which cell was wrong and which was correct and which was missing
 grid_diff([], [], []).
 grid_diff([RowGrid|RestGrid], [RowCorrect|RestCorrect], [RowDiff|RestDiff]) :-
     maplist(compare_cell, RowGrid, RowCorrect, RowDiff),
@@ -110,7 +119,9 @@ replace_at_pos([Head|Tail], Pos, Element, [Head|Result]) :-
     Pos > 0,
     Pos1 is Pos - 1,
     replace_at_pos(Tail, Pos1, Element, Result).
+% ----- Control and process the user input -----
 
+% ----- Create Grid -----
 empty_grid([], 0, _).
 empty_grid([Row|Rest], R, C) :-
     R > 0,
@@ -123,7 +134,9 @@ empty_row([_|Tail], N) :-
     N > 0,
     N1 is N-1,
     empty_row(Tail, N1).
+% ----- Create Grid -----
 
+% ----- Printing Current Grid -----
 print_puzzle(Grid, RowsHint, ColumnsHint) :-
     print_rows(Grid,RowsHint),
     print_columns(ColumnsHint),nl.
@@ -153,15 +166,19 @@ print_columns(Cols) :-
 
 first_elements([], _, []).
 first_elements([Head|Rest],Head, Rest).
+% ----- Printing Current Grid -----
 
+% Optimizing strategy : Calculate all Posibilities for every Row and Column and sort it according to the number of Possibilities. 
+% Therefore the Row/Column with the fewest is processed first -> at this row/column the probability is the highest to find the correct solution at the first try.
 optimList([],[],[]).
 optimList([Element|Elements], [Hint|Hints],[element(SolutionCount, Element, Hint)|Result]) :-
     length(Element, ElemLength),
-    length(ElementCopy, ElemLength),
-    findall(ElementCopy, valid_row(Element, Hint), Solutions),
+    length(ElementCopy, ElemLength), % create a copy of row to NOT change the actual row variables (simply create a list with the same length)
+    findall(ElementCopy, valid_row(Element, Hint), Solutions), % get all possibilites for current row
     length(Solutions, SolutionCount),
     optimList(Elements, Hints, Result).
 
+% ----- solving algorithm -----
 solve(Grid, RowsHint, ColumnsHint, Optimize) :-
     transpose(Grid, Columns),!,
     (Optimize ->
@@ -209,7 +226,9 @@ valid_block(['X'|Row], Rest, N) :-
     N > 0,
     N1 is N - 1,
     valid_block(Row, Rest, N1).
+% ----- solving algorithm -----
 
+% Examples with 5 different complexities
 test(N) :- random_puzzle(N, R, C), nonogram(R, C, false).
 
 user(N) :- random_puzzle(N, R, C), nonogram(R, C, true).
