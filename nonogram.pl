@@ -1,67 +1,59 @@
 /**
-    Nonogram Solver in Prolog by Richard Hoang, Sebastian Windsperger and Julia Weißenbrunner
-*/
+ * @program: prolog programm that solves nonogram puzzles
+ * @date: 09.12.2023
+ * @authors: - Richard Hoang (k12007790)
+ *           - Sebastian Windsperger  (k12021114)
+ *           - Julia Weißenbrunner (k12005535)
+ */
 
-% Solve the nonogram with according Rows- and Colum Hints either with User Input or automatically solve it
+% Solve the nonogram with according Rows- and Colum Hints either with User Input or automatically
 nonogram(RowsHint, ColumnsHint, UserInput):-
     get_lengths(RowsHint, ColumnsHint, R, C),
-    empty_grid(Grid, R, C),
-    print_puzzle(Grid,RowsHint, ColumnsHint),
+    create_grid(R, C, '_', EmptyGrid),
+    print_puzzle(EmptyGrid, RowsHint, ColumnsHint),
     (UserInput ->
-       user_input(Grid, RowsHint, ColumnsHint);
+       user_input(EmptyGrid, RowsHint, ColumnsHint, 'X');
 
+       create_grid(R, C, Grid),
        solve(Grid, RowsHint, ColumnsHint, true),
        print_puzzle(Grid, RowsHint, ColumnsHint)
     ).
 
 % ----- Control and process the user input -----
-user_input(Grid, RowsHint, ColumnsHint) :-
+user_input(Grid, RowsHint, ColumnsHint, MarkSymbol) :-
     writeln('Enter grid cell (Col,Row):'),
     read_cell(Col, Row),
-    (valid_input(Col, Row, RowsHint, ColumnsHint) ->
-       mark_cell(Grid, Row, Col, 'X', NewGrid),
-       print_puzzle(NewGrid, RowsHint, ColumnsHint),
-       write('Continue or undo last move? y/u/n'),
-       read(Continue),
-       continue(Continue, NewGrid, RowsHint, ColumnsHint);
+    valid_input(Col, Row, RowsHint, ColumnsHint),
+    mark_cell(Grid, Row, Col, MarkSymbol, NewGrid),
+    print_puzzle(NewGrid, RowsHint, ColumnsHint),
+    write('Continue or undo a move? y/u/n'),
+    read(Continue),
+    continue_or_undo(Continue, NewGrid, RowsHint, ColumnsHint).
 
-       write('Invalid input. '),
-       user_input(Grid, RowsHint, ColumnsHint)
-    ).
+user_input(Grid, RowsHint, ColumnsHint, MarkSymbol) :-
+    writeln('Invalid input.'),
+    user_input(Grid, RowsHint, ColumnsHint, MarkSymbol).
 
 % continue solving
-continue('y', Grid, RowsHint, ColumnsHint) :-
-    user_input(Grid, RowsHint, ColumnsHint).
+continue_or_undo('y', Grid, RowsHint, ColumnsHint) :-
+    user_input(Grid, RowsHint, ColumnsHint, 'X').
 
 % clear cell
-continue('u', Grid, RowsHint, ColumnsHint) :-
-    writeln('Enter the cell you want to clear (Col,Row):'),
-    read_cell(Col, Row),
-    (valid_input(Col, Row, RowsHint, ColumnsHint) ->
-       mark_cell(Grid, Row, Col, '_', NewGrid),
-       print_puzzle(NewGrid, RowsHint, ColumnsHint),
-       user_input(NewGrid, RowsHint, ColumnsHint);
-       write('Invalid input. '),
-       continue('u', Grid, RowsHint, ColumnsHint)
-    ).
+continue_or_undo('u', Grid, RowsHint, ColumnsHint) :-
+    user_input(Grid, RowsHint, ColumnsHint, '_').
 
-% User is finished - check if it's correct
-continue(_, Grid, RowsHint, ColumnsHint) :-
+% User is finished - check if its correct
+continue_or_undo(_, Grid, RowsHint, ColumnsHint) :-
     get_lengths(RowsHint, ColumnsHint, R, C),
-    empty_grid(CorrectGrid, R, C),
-    solve(CorrectGrid, RowsHint, ColumnsHint, true),
-    (maplist(x_at_same_position, Grid, CorrectGrid) ->
-             write('Correct solution. You win!');
-             writeln('Wrong solution. Game Over!'),
-             grid_diff(Grid, CorrectGrid, DiffGrid),
-             print_puzzle(DiffGrid, RowsHint, ColumnsHint)
-    ).
+    create_grid(R, C, CorrectGrid),
+    solve(CorrectGrid, RowsHint, ColumnsHint, false),
+    ((Grid == CorrectGrid) ->
+        write('Correct solution. You win!');
 
-x_at_same_position([], []).
-x_at_same_position([CellGrid|RestGrid], [CellCorrect|RestCorrect]) :-
-    (CellGrid == 'X', CellCorrect == 'X' ;
-     CellGrid \== 'X', CellCorrect \== 'X'), %Grid uses anon. vars and CorrectGrid "_" strings so a direct comp with == is not possible
-    x_at_same_position(RestGrid, RestCorrect).
+        writeln('Wrong solution. Game Over!'),
+        grid_diff(Grid, CorrectGrid, DiffGrid),
+        print_puzzle(DiffGrid, RowsHint, ColumnsHint)
+    ).
 
 % calculate grid differences to enable printig grid with informations about which cell was wrong and which was correct and which was missing
 grid_diff([], [], []).
@@ -69,18 +61,10 @@ grid_diff([RowGrid|RestGrid], [RowCorrect|RestCorrect], [RowDiff|RestDiff]) :-
     maplist(compare_cell, RowGrid, RowCorrect, RowDiff),
     grid_diff(RestGrid, RestCorrect, RestDiff).
 
-compare_cell(CellGrid, CellCorrect, CellDiff) :-
-    (CellGrid == CellCorrect ->
-        CellDiff = '\e[32mX\e[0m';
-        (CellGrid == 'X' ->
-           CellDiff = '\e[31mX\e[0m';
-           (CellCorrect == 'X' ->
-              CellDiff = '\e[90mX\e[0m';
-              CellDiff = '_'
-           )
-        )
-     ).
-
+compare_cell('X', 'X', '\e[32mX\e[0m').
+compare_cell('X', '_', '\e[31mX\e[0m').
+compare_cell('_', 'X', '\e[90mX\e[0m').
+compare_cell('_', '_', '_').
 
 get_lengths(RowsHint, ColumnsHint, R, C) :-
     length(RowsHint, R),
@@ -122,18 +106,31 @@ replace_at_pos([Head|Tail], Pos, Element, [Head|Result]) :-
 % ----- Control and process the user input -----
 
 % ----- Create Grid -----
-empty_grid([], 0, _).
-empty_grid([Row|Rest], R, C) :-
+create_grid(0, _, _, []).
+create_grid(R, C, Fill, [Row|Rest]) :-
     R > 0,
     R1 is R-1,
-    empty_row(Row, C),
-    empty_grid(Rest, R1, C).
+    create_row(C, Fill, Row),
+    create_grid(R1, C, Fill, Rest).
 
-empty_row([], 0).
-empty_row([_|Tail], N) :-
+create_grid(0, _, []).
+create_grid(R, C, [Row|Rest]) :- 
+    R > 0,
+    R1 is R-1,
+    create_row(C, Row),
+    create_grid(R1, C, Rest).
+
+create_row(0, []).
+create_row(N, [_|Tail]) :-
     N > 0,
     N1 is N-1,
-    empty_row(Tail, N1).
+    create_row(N1, Tail).
+
+create_row(0, _, []).
+create_row(N, Fill, [Fill|Tail]) :-
+    N > 0,
+    N1 is N-1,
+    create_row(N1, Fill, Tail).
 % ----- Create Grid -----
 
 % ----- Printing Current Grid -----
@@ -142,20 +139,18 @@ print_puzzle(Grid, RowsHint, ColumnsHint) :-
     print_columns(ColumnsHint),nl.
 
 print_rows([], []).
-print_rows([Head|RestRows], [Hints|RestHints]) :-
-    print_list(Head, '|'),
+print_rows([Row|RestRows], [Hints|RestHints]) :-
+    print_list(Row, '|'),
     print_list(Hints,' '), nl,
     print_rows(RestRows,RestHints).
 
 print_list([],_).
 print_list([Head|Tail], Seperator) :-
-    print_element(Head, Seperator),
+    print_element(Head),
     write(Seperator),
     print_list(Tail, Seperator).
 
-print_element(E, Sep) :- var(E) ->
-                          (Sep == ' ' -> write(' ');write('_'));
-                          write(E).
+print_element(E) :- var(E) -> write(' ');write(E).
 
 print_columns([]).
 print_columns([[]|Tail]) :- write(' '), write(' '),print_columns(Tail). % in case of empty list, add whitespace
