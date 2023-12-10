@@ -15,7 +15,7 @@ nonogram(RowsHint, ColumnsHint, UserInput):-
        user_input(EmptyGrid, RowsHint, ColumnsHint, 'X');
 
        create_grid(R, C, Grid),
-       solve(Grid, RowsHint, ColumnsHint, true),
+       solve(Grid, RowsHint, ColumnsHint),
        print_puzzle(Grid, RowsHint, ColumnsHint)
     ).
 
@@ -46,7 +46,7 @@ continue_or_undo('u', Grid, RowsHint, ColumnsHint) :-
 continue_or_undo(_, Grid, RowsHint, ColumnsHint) :-
     get_lengths(RowsHint, ColumnsHint, R, C),
     create_grid(R, C, CorrectGrid),
-    solve(CorrectGrid, RowsHint, ColumnsHint, false),
+    solve(CorrectGrid, RowsHint, ColumnsHint),
     ((Grid == CorrectGrid) ->
         write('Correct solution. You win!');
 
@@ -61,10 +61,10 @@ grid_diff([RowGrid|RestGrid], [RowCorrect|RestCorrect], [RowDiff|RestDiff]) :-
     maplist(compare_cell, RowGrid, RowCorrect, RowDiff),
     grid_diff(RestGrid, RestCorrect, RestDiff).
 
-compare_cell('X', 'X', '\e[32mX\e[0m').
-compare_cell('X', '_', '\e[31mX\e[0m').
-compare_cell('_', 'X', '\e[90mX\e[0m').
-compare_cell('_', '_', '_').
+compare_cell('X', 'X', '\e[32mX\e[0m'). % when both cells are the same then mark the cell as green
+compare_cell('X', '_', '\e[31mX\e[0m'). % when the user marks the incorrect cell then mark the cell as red
+compare_cell('_', 'X', '\e[90mX\e[0m'). % when the user did not mark the right cell then mark the cell as gray 
+compare_cell('_', '_', '_'). 
 
 get_lengths(RowsHint, ColumnsHint, R, C) :-
     length(RowsHint, R),
@@ -86,8 +86,8 @@ valid_input(Col, Row, RowsHint, ColumnsHint) :-
 
 mark_cell(Grid, R, C, Symbol, NewGrid) :-
     find_element_at(R, Grid, Row),
-    replace_at_pos(Row, C, Symbol, NewRow),
-    replace_at_pos(Grid, R, NewRow, NewGrid).
+    replace_at_pos(Row, C, Symbol, NewRow), % get new row with marked cell
+    replace_at_pos(Grid, R, NewRow, NewGrid). % replace old row with new row
 
 find_element_at(0, [Head|_], Head).
 find_element_at(Pos,[_|Tail], Element) :-
@@ -96,9 +96,10 @@ find_element_at(Pos,[_|Tail], Element) :-
     find_element_at(Pos1, Tail, Element).
 
 % create new list with old element and new element at specified position
-replace_at_pos([], _, _, []).
-replace_at_pos([_|Tail], 0, Element, [Element|Tail]) :-
-    !. % Cut to stop backtracking, we found the position.
+% add element to the tail of the input list
+replace_at_pos([_|Tail], 0, Element, [Element|Tail]).
+
+% copy head of the input list to the result list
 replace_at_pos([Head|Tail], Pos, Element, [Head|Result]) :-
     Pos > 0,
     Pos1 is Pos - 1,
@@ -163,34 +164,11 @@ first_elements([], _, []).
 first_elements([Head|Rest],Head, Rest).
 % ----- Printing Current Grid -----
 
-% Optimizing strategy : Calculate all Posibilities for every Row and Column and sort it according to the number of Possibilities. 
-% Therefore the Row/Column with the fewest is processed first -> at this row/column the probability is the highest to find the correct solution at the first try.
-optimList([],[],[]).
-optimList([Element|Elements], [Hint|Hints],[element(SolutionCount, Element, Hint)|Result]) :-
-    length(Element, ElemLength),
-    length(ElementCopy, ElemLength), % create a copy of row to NOT change the actual row variables (simply create a list with the same length)
-    findall(ElementCopy, valid_row(Element, Hint), Solutions), % get all possibilites for current row
-    length(Solutions, SolutionCount),
-    optimList(Elements, Hints, Result).
-
 % ----- solving algorithm -----
-solve(Grid, RowsHint, ColumnsHint, Optimize) :-
+solve(Grid, RowsHint, ColumnsHint) :-
     transpose(Grid, Columns),!,
-    (Optimize ->
-        append(RowsHint, ColumnsHint, AllHints),
-        append(Grid, Columns, Elements),
-        optimList(Elements, AllHints, OptimList),
-        sort(OptimList, SortedOptimList),
-        solve(SortedOptimList);
-
-        maplist(valid_row, Grid, RowsHint),
-        maplist(valid_row, Columns, ColumnsHint)
-    ).
-
-solve([]).
-solve([element(_,Element,Hint)|Rest]) :-
-    valid_row(Element, Hint),
-    solve(Rest).
+    maplist(valid_row, Grid, RowsHint),
+    maplist(valid_row, Columns, ColumnsHint).
 
 trim(List, List).
 trim(['_'|List], Result) :- trim(List, Result).
@@ -269,15 +247,3 @@ puzzle(2, 3, R, C) :-
 puzzle(3, 1, R, C) :-
     R = [[3],[2,1],[3,2],[2,2],[6],[1,5],[6],[1],[2]],
     C = [[1,2],[3,1],[1,5],[7,1],[5],[3],[4],[3]].
-
-
-%Complexity 4
-puzzle(4, 1, R, C) :-
-    R = [[3],[4,2],[6,6],[6,2,1],[1,4,2,1],[6,3,2],[6,7],[6,8],[1,10],
-                [1,10],[1,10],[1,1,4,4],[3,4,4],[4,4],[4,4]],
-    C = [[1],[11],[3,3,1],[7,2],[7],[15],[1,5,7],[2,8],[14],[9],[1,6],
-                [1,9],[1,9],[1,10],[12]].
-    
-
-% TODO: define further puzzles for complexity 1 to 5
-
